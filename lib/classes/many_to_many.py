@@ -1,74 +1,147 @@
-# Necessary imports
-from typing import List, Optional
-
-class Magazine:
-    all = []
-
-    def __init__(self, name: str, category: str):
-        if not isinstance(name, str) or not isinstance(category, str):
-            raise ValueError("Name and category must be strings.")
-        if not (2 <= len(name) <= 16):
-            raise ValueError("Magazine name must be between 2 and 16 characters.")
-        if not category.strip():
-            raise ValueError("Category cannot be empty.")
-        self.name = name
-        self.category = category
-        Magazine.all.append(self)
-
-    def articles(self) -> List["Article"]:
-        return [article for article in Article.all if article.magazine == self]
-
-    def contributors(self) -> List["Author"]:
-        return list({article.author for article in self.articles()})
-
-    def article_titles(self) -> Optional[List[str]]:
-        titles = [article.title for article in self.articles()]
-        return titles if titles else None
-
-    def contributing_authors(self) -> Optional[List["Author"]]:
-        authors = [author for author in self.contributors() if len(author.articles()) > 2]
-        return authors if authors else None
-
-    @staticmethod
-    def top_publisher() -> Optional["Magazine"]:
-        return max(Magazine.all, key=lambda mag: len(mag.articles()), default=None)
-
-
-class Author:
-    def __init__(self, name: str):
-        if not isinstance(name, str):
-            raise ValueError("Author name must be a string.")
-        self.name = name
-
-    def articles(self) -> List["Article"]:
-        return [article for article in Article.all if article.author == self]
-
-    def magazines(self) -> List["Magazine"]:
-        return list({article.magazine for article in self.articles()})
-
-    def add_article(self, magazine: "Magazine", title: str):
-        Article(self, magazine, title)
-
-    def topic_areas(self) -> Optional[List[str]]:
-        topics = [magazine.category for magazine in self.magazines()]
-        return list(set(topics)) if topics else None
-
-
 class Article:
     all = []
 
-    def __init__(self, author: Author, magazine: Magazine, title: str):
-        if not isinstance(author, Author) or not isinstance(magazine, Magazine) or not isinstance(title, str):
-            raise ValueError("Invalid input types for Article.")
+    def __init__(self, author, magazine, title):
+        if not isinstance(title, str):
+            raise TypeError("Title must be a string.")
+        if not (5 <= len(title) <= 50):
+            raise ValueError("Title must be between 5 and 50 characters.")
+
+        if not isinstance(author, Author):
+            raise TypeError("Author must be an instance of the Author class.")
+
+        if not isinstance(magazine, Magazine):
+            raise TypeError("Magazine must be an instance of the Magazine class.")
+
         self.author = author
         self.magazine = magazine
-        self._title = title  # Use a private variable for title to make it immutable
+        self._title = title
+
+        author._articles.append(self)
+        author._magazines.add(magazine)
+        magazine.add_article(self)
+
         Article.all.append(self)
 
     @property
     def title(self):
         return self._title
 
-    @title.setter
-    def title(self, value):
-        raise AttributeError("Cannot modify the title once it is set.")
+    @property
+    def author(self):
+        return self._author
+
+    @property
+    def magazine(self):
+        return self._magazine
+
+    @author.setter
+    def author(self, value):
+        if not isinstance(value, Author):
+            raise TypeError("Author must be an instance of the Author class.")
+        self._author = value
+
+    @magazine.setter
+    def magazine(self, value):
+        if not isinstance(value, Magazine):
+            raise TypeError("Magazine must be an instance of the Magazine class.")
+        self._magazine = value
+
+
+class Author:
+    def __init__(self, name):
+        if not isinstance(name, str) or not name.strip():
+            raise TypeError("Name must be a non-empty string.")
+        self._name = name
+        self._articles = []  # List of Article instances
+        self._magazines = set()  # Set of Magazine instances
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def articles(self):
+        return self._articles[:]
+
+    @property
+    def magazines(self):
+        return list(self._magazines)
+
+    def add_article(self, magazine, title):
+        if not isinstance(magazine, Magazine):
+            raise TypeError("Magazine must be an instance of the Magazine class.")
+        if not isinstance(title, str) or not title.strip():
+            raise TypeError("Title must be a non-empty string.")
+        
+        # Check if an article with the same title and magazine already exists
+        for article in self._articles:
+            if article.title == title and article.magazine == magazine:
+                return article
+        
+        article = Article(self, magazine, title)
+        self._magazines.add(magazine)
+        return article
+
+    @property
+    def topic_areas(self):
+        if not self._magazines:
+            return []
+        return list({magazine.category for magazine in self._magazines})
+
+    def __repr__(self):
+        return f"Author({self.name})"
+
+
+class Magazine:
+    def __init__(self, name, category):
+        if not isinstance(name, str) or not (2 <= len(name) <= 16):
+            raise ValueError("Name must be a string between 2 and 16 characters.")
+        if not isinstance(category, str) or not category.strip():
+            raise ValueError("Category must be a non-empty string.")
+        self._name = name
+        self._category = category
+        self._articles = []  # List of Article instances
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        if not isinstance(value, str) or not (2 <= len(value) <= 16):
+            raise ValueError("Name must be a string between 2 and 16 characters.")
+        self._name = value
+
+    @property
+    def category(self):
+        return self._category
+
+    @category.setter
+    def category(self, value):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Category must be a non-empty string.")
+        self._category = value
+
+    def add_article(self, article):
+        if not isinstance(article, Article):
+            raise TypeError("Article must be an instance of the Article class.")
+        if article not in self._articles:
+            self._articles.append(article)
+
+    @property
+    def articles(self):
+        return self._articles[:]
+
+    def contributors(self):
+        return list({article.author for article in self._articles})
+
+    def article_titles(self):
+        return [article.title for article in self._articles]
+
+    def contributing_authors(self):
+        authors = {article.author for article in self._articles}
+        return {author for author in authors if len([article for article in self._articles if article.author == author]) > 2}
+
+    def __repr__(self):
+        return f"Magazine({self.name}, {self.category})"
